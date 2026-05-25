@@ -1,0 +1,190 @@
+esphome:
+  name: esp-gti
+  friendly_name: ESP-GTI
+
+  on_boot:
+    priority: 600
+    then:
+      - number.set:
+          id: gti_power
+          value: 0
+
+##########################################################
+# ESP32-C5
+##########################################################
+
+esp32:
+  variant: esp32c5
+  board: esp32-c5-devkitc-1
+  flash_size: 4MB
+
+  framework:
+    type: esp-idf
+    version: latest
+
+##########################################################
+# LOGGER
+##########################################################
+
+logger:
+  level: INFO
+
+##########################################################
+# API / OTA
+##########################################################
+
+api:
+
+ota:
+  - platform: esphome
+
+##########################################################
+# WIFI SETUP
+##########################################################
+
+wifi:
+  ap:
+    ssid: "ESP-GTI Setup"
+    password: "12345678"
+
+  reboot_timeout: 0s
+  power_save_mode: none
+
+captive_portal:
+
+##########################################################
+# WEB SERVER
+##########################################################
+
+web_server:
+  port: 80
+
+##########################################################
+# MCP4151 COMPONENT
+##########################################################
+
+external_components:
+  - source:
+      type: git
+      url: https://github.com/codermarti/esphome
+      ref: dev
+    components: [mcp4151]
+
+##########################################################
+# SPI
+##########################################################
+
+spi:
+  clk_pin: GPIO6
+  mosi_pin: GPIO7
+
+##########################################################
+# MCP4151 OUTPUT
+##########################################################
+
+output:
+  - platform: mcp4151
+    id: gti_pot
+    cs_pin: GPIO10
+
+##########################################################
+# GTI POWER CONTROL
+##########################################################
+
+number:
+  - platform: template
+    name: "GTI Power"
+    id: gti_power
+
+    min_value: 0
+    max_value: 425
+    step: 5
+
+    unit_of_measurement: "W"
+
+    optimistic: true
+    restore_value: true
+
+    initial_value: 0
+
+    set_action:
+      - lambda: |-
+
+          /*
+            REAL MEASURED VALUES
+
+            0 W   = 9.40 kΩ
+            425 W = 5.94 kΩ
+
+            MCP range:
+            0.00 -> 0.38
+          */
+
+          float watt = x;
+
+          if (watt < 0)
+            watt = 0;
+
+          if (watt > 425)
+            watt = 425;
+
+          /*
+            Convert watt to MCP level
+          */
+
+          float level =
+            (watt / 425.0) * 0.38;
+
+          /*
+            Safety clamp
+          */
+
+          if (level < 0.0)
+            level = 0.0;
+
+          if (level > 0.38)
+            level = 0.38;
+
+          /*
+            Set MCP4151
+          */
+
+          id(gti_pot).set_level(level);
+
+          ESP_LOGI(
+            "GTI",
+            "Power %.0fW -> MCP %.3f",
+            watt,
+            level
+          );
+
+##########################################################
+# OPTIONAL TEMPERATURE SENSOR
+##########################################################
+
+# one_wire:
+#   - platform: gpio
+#     pin: GPIO28
+
+# sensor:
+#   - platform: dallas_temp
+#     name: "GTI Temperature"
+#     update_interval: 10s
+
+##########################################################
+# WIFI INFO
+##########################################################
+
+text_sensor:
+  - platform: wifi_info
+
+    ip_address:
+      name: "ESP-GTI IP"
+
+##########################################################
+# STATUS
+##########################################################
+
+binary_sensor:
+  - platform: status
+    name: "ESP-GTI Online"
