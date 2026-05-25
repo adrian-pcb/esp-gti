@@ -10,13 +10,12 @@ esphome:
           value: 0
 
 ##########################################################
-# ESP32-C5
+# ESP32
 ##########################################################
 
 esp32:
-  variant: esp32c5
   board: esp32-c5-devkitc-1
-  flash_size: 4MB
+  variant: esp32c5
 
   framework:
     type: esp-idf
@@ -39,7 +38,7 @@ ota:
   - platform: esphome
 
 ##########################################################
-# WIFI SETUP
+# WIFI
 ##########################################################
 
 wifi:
@@ -93,86 +92,36 @@ output:
 
 number:
   - platform: template
-    name: "GTI Power"
+    name: "GTI Level"
     id: gti_power
 
     min_value: 0
-    max_value: 425
-    step: 5
+    max_value: 100
+    step: 1
 
-    unit_of_measurement: "W"
+    unit_of_measurement: "%"
 
     optimistic: true
     restore_value: true
-
     initial_value: 0
 
     set_action:
       - lambda: |-
 
-          /*
-            REAL MEASURED VALUES
-
-            0 W   = 9.40 kΩ
-            425 W = 5.94 kΩ
-
-            MCP range:
-            0.00 -> 0.38
-          */
-
-          float watt = x;
-
-          if (watt < 0)
-            watt = 0;
-
-          if (watt > 425)
-            watt = 425;
-
-          /*
-            Convert watt to MCP level
-          */
-
           float level =
-            (watt / 425.0) * 0.38;
-
-          /*
-            Safety clamp
-          */
-
-          if (level < 0.0)
-            level = 0.0;
-
-          if (level > 0.38)
-            level = 0.38;
-
-          /*
-            Set MCP4151
-          */
+            (100.0 - x) / 100.0;
 
           id(gti_pot).set_level(level);
 
           ESP_LOGI(
             "GTI",
-            "Power %.0fW -> MCP %.3f",
-            watt,
+            "Level %.0f%% -> MCP %.3f",
+            x,
             level
           );
 
 ##########################################################
-# OPTIONAL TEMPERATURE SENSOR
-##########################################################
-
-# one_wire:
-#   - platform: gpio
-#     pin: GPIO28
-
-# sensor:
-#   - platform: dallas_temp
-#     name: "GTI Temperature"
-#     update_interval: 10s
-
-##########################################################
-# WIFI INFO
+# STATUS
 ##########################################################
 
 text_sensor:
@@ -180,10 +129,6 @@ text_sensor:
 
     ip_address:
       name: "ESP-GTI IP"
-
-##########################################################
-# STATUS
-##########################################################
 
 binary_sensor:
   - platform: status
